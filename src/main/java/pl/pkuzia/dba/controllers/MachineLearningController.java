@@ -1,17 +1,25 @@
 package pl.pkuzia.dba.controllers;
 
 import ml.dmlc.xgboost4j.java.Booster;
+import ml.dmlc.xgboost4j.java.DMatrix;
 import ml.dmlc.xgboost4j.java.XGBoost;
 import ml.dmlc.xgboost4j.java.XGBoostError;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import pl.pkuzia.dba.domains.Classification;
+import pl.pkuzia.dba.responses.ClassificationResponse;
+import pl.pkuzia.dba.services.ClassificationService;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-
-import ml.dmlc.xgboost4j.java.DMatrix;
 
 /**
  * Created by Przemysław Kuzia on 01.05.2018.
@@ -19,24 +27,69 @@ import ml.dmlc.xgboost4j.java.DMatrix;
 @RestController
 public class MachineLearningController {
 
-    @RequestMapping("/hello")
-    public String sayHello(@RequestParam(value = "name") String name) {
-        return "Hello " + name;
+    @Autowired
+    private ClassificationService classificationService;
+
+    @RequestMapping(value = "/ml-data", method = RequestMethod.POST)
+    public ResponseEntity saveMLData(@RequestParam(value = "data") String data) {
+        ClassLoader classLoader = getClass().getClassLoader();
+        try {
+            FileWriter dataFile = new FileWriter(classLoader.getResource("data.txt").getPath(), true);
+            dataFile.write(data);
+            dataFile.write("\n");
+            dataFile.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return new ResponseEntity(HttpStatus.CONFLICT);
+        }
+        return new ResponseEntity(HttpStatus.NO_CONTENT);
     }
 
+    @RequestMapping(value = "/classify", method = RequestMethod.POST)
+    public ResponseEntity classifyData(@RequestParam(value = "data") String data) {
+        Classification classification = classificationService.classifyDrive(data);
+        ClassificationResponse classificationResponse = new ClassificationResponse(classification);
+        return new ResponseEntity(classificationResponse, HttpStatus.OK);
+        /*ClassLoader classLoader = getClass().getClassLoader();
+        Booster booster = null;
+        DMatrix dataMatrix = null;
+        try {
+            booster = XGBoost.loadModel(classLoader.getResource("model.bin").getPath());
+            FileWriter dataFile = new FileWriter(classLoader.getResource("classifyData.txt").getPath());
+            dataFile.write(data);
+            dataFile.close();
+            dataMatrix = new DMatrix(classLoader.getResource("classifyData.txt").getPath());
 
-    @RequestMapping("ml-test")
-    public void mlTest() {
+        } catch (XGBoostError xgBoostError) {
+            xgBoostError.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return new ResponseEntity(HttpStatus.CONFLICT);
+        }
+        try {
+            float[][] predict = booster.predict(dataMatrix);
+
+        } catch (XGBoostError xgBoostError) {
+            xgBoostError.printStackTrace();
+        }
+        return new ResponseEntity(HttpStatus.NO_CONTENT);*/
+    }
+
+    @RequestMapping(value = "/learn-model", method = RequestMethod.POST)
+    public void learnModel() {
 
         DMatrix trainMat = null;
+        ClassLoader classLoader = getClass().getClassLoader();
         try {
-            trainMat = new DMatrix("/Users/Przemo/Praca/Projekty/driving-behaviour-analyzer-web/src/main/resources/seismic");
+            trainMat = new DMatrix(classLoader.getResource("learn-data.t").getPath());
         } catch (XGBoostError xgBoostError) {
             xgBoostError.printStackTrace();
         }
         DMatrix testMat = null;
+        DMatrix testMat2 = null;
         try {
-            testMat = new DMatrix("/Users/Przemo/Praca/Projekty/driving-behaviour-analyzer-web/src/main/resources/seismic.t");
+            testMat = new DMatrix(classLoader.getResource("test-data.t").getPath());
+            testMat2 = new DMatrix(classLoader.getResource("test-data").getPath());
         } catch (XGBoostError xgBoostError) {
             xgBoostError.printStackTrace();
         }
@@ -67,6 +120,8 @@ public class MachineLearningController {
             float[][] predicts = booster.predict(testMat);
             System.out.println(calculateError(covertPredictsArray(predicts), testMat.getLabel()));
             booster.saveModel("model.bin");
+            float[][] predicts2 = booster.predict(testMat2);
+            System.out.println(predicts2);
         } catch (XGBoostError xgBoostError) {
             xgBoostError.printStackTrace();
         }
