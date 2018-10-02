@@ -23,4 +23,17 @@ public enum Classification {
     };
 
     public abstract String getType();
+
+    public static Classification mapToClassificationType(float label) {
+        if (label == 0.0f) {
+            return SOFT;
+        }
+        if (label == 1.0f) {
+            return OPTIMAL;
+        }
+        if (label == 2.0f) {
+            return HARD;
+        }
+        else return UNKNOWN;
+    }
 }
